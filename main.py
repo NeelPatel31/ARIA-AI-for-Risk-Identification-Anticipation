@@ -1,0 +1,15 @@
+import uvicorn
+
+from app.config import settings
+from app.utils import logger
+
+from app import app
+
+
+def main():
+    logger.info("Starting ARIA on %s:%s", settings.APP_HOST, settings.APP_PORT)
+    uvicorn.run(app, host=settings.APP_HOST, port=settings.APP_PORT)
+
+
+if __name__ == "__main__":
+    main()
