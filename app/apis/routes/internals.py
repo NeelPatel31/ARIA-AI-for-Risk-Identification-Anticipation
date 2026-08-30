@@ -5,7 +5,10 @@ from fastapi.responses import JSONResponse
 
 from app.apis.controllers import (
     generate_answer_controller,
+    generate_news_answer_controller,
     retrieve_chunks_controller,
+    retrieve_news_chunks_controller,
+    train_news_chunks_controller,
     train_product_chunks_controller,
 )
 from app.apis.validation_models import QueryRequest
@@ -46,6 +49,20 @@ async def train_products():
         )
 
 
+@internals_router.post("/train-news")
+async def train_news():
+    try:
+        result = train_news_chunks_controller()
+        logger.info(f"News training completed: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in /train-news endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "News training failed", "detail": str(e)},
+            status_code=500,
+        )
+
+
 @internals_router.post("/retrieve")
 async def retrieve(request: QueryRequest):
     try:
@@ -60,6 +77,20 @@ async def retrieve(request: QueryRequest):
         )
 
 
+@internals_router.post("/retrieve-news")
+async def retrieve_news(request: QueryRequest):
+    try:
+        result = await retrieve_news_chunks_controller(request)
+        logger.info(f"/retrieve-news completed for query: {request.user_query}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in /retrieve-news endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "News retrieval failed", "detail": str(e)},
+            status_code=500,
+        )
+
+
 @internals_router.post("/query")
 async def query(request: QueryRequest):
     try:
@@ -70,5 +101,19 @@ async def query(request: QueryRequest):
         logger.error(f"Error in /query endpoint: {e}", exc_info=True)
         return JSONResponse(
             content={"error": "Answer generation failed", "detail": str(e)},
+            status_code=500,
+        )
+
+
+@internals_router.post("/query-news")
+async def query_news(request: QueryRequest):
+    try:
+        result = await generate_news_answer_controller(request)
+        logger.info(f"/query-news completed for query: {request.user_query}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in /query-news endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "News answer generation failed", "detail": str(e)},
             status_code=500,
         )
