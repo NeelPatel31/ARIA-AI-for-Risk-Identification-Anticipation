@@ -19,6 +19,7 @@ entities: [EV Vehicle, Battery, Lithium, Cobalt, Graphite, Nickel, Steel, Iron, 
 - Production Site: Shenzhen, Guangdong, China
 - Price: 200 USD per unit
 - Export Control Status: Regular
+- Stock: Medium
 
 ### Battery — Nickel Variant (alternative raw material for EV Vehicle)
 - Composition: Nickel
@@ -32,27 +33,28 @@ entities: [EV Vehicle, Battery, Lithium, Cobalt, Graphite, Nickel, Steel, Iron, 
 - Source Locations: China; Ukraine
 - Price: 100 USD per tonne
 - Export Control Status: Regular
+- Stock: High
 
 ## Manufacturing
 ### Shenzhen Plant (manufactures Battery for EV Vehicle)
 - Location: Shenzhen, Guangdong, China
 - Capacity: 50,000 units per month
 - Transport Cost: 15 USD per unit, for Lithium, Cobalt, and Graphite shipped to the plant
-- Local Rules: None
+- Local Rules: Carbon-emissions trading scheme caps annual plant output; exceeding the allowance requires buying permits or funding local abatement projects. Labor law limits weekly overtime, so extra shifts need staggered, approved scheduling.
 
 ### Lviv Plant (manufactures Steel for EV Vehicle)
 - Location: Lviv, Lviv Oblast, Ukraine
 - Capacity: 30,000 tonnes per month
 - Transport Cost: 10 USD per tonne, for Iron shipped to the plant
-- Local Rules: None
+- Local Rules: Martial-law logistics rules require security-cleared shipments and rail-slot bookings through Ukrzaliznytsia; missing clearances halt dispatch. Grid-rationing windows cap plant operating hours, barring round-the-clock output.
 
 ## Delivery
 ### Shenzhen Distribution Hub (stores Battery for EV Vehicle)
 - Location: Shenzhen, Guangdong, China
 - Warehouse Cost: 5,000 USD per month
-- Local Rules: None
+- Local Rules: Fire-zone zoning caps hazardous-material inventory mass and mandates sprinklered, segregated bays; residential proximity buffers prohibit contiguous warehouse expansion.
 
 ### Lviv Distribution Hub (stores Steel for EV Vehicle)
 - Location: Lviv, Lviv Oblast, Ukraine
 - Warehouse Cost: 3,000 USD per month
-- Local Rules: None
+- Local Rules: Transit-terminal access requires security passes renewed monthly, and rail-slot allocations through Ukrzaliznytsia grant westerly hubs priority only at set windows, capping throughput.

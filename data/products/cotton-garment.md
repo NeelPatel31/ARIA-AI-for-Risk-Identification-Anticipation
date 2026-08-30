@@ -19,6 +19,7 @@ entities: [Cotton Garment, Cotton, Polyester, China, Ukraine, Jiangsu, Nanjing, 
 - Production Site: Nanjing, Jiangsu, China
 - Price: 3 USD per unit
 - Export Control Status: Regular
+- Stock: Medium
 
 ### Polyester (raw material for Cotton Garment)
 - Composition: Polyester
@@ -26,27 +27,28 @@ entities: [Cotton Garment, Cotton, Polyester, China, Ukraine, Jiangsu, Nanjing, 
 - Production Site: Kyiv, Kyiv Oblast, Ukraine
 - Price: 2 USD per unit
 - Export Control Status: Regular
+- Stock: Medium
 
 ## Manufacturing
 ### Nanjing Plant (manufactures Cotton textiles for Cotton Garment)
 - Location: Nanjing, Jiangsu, China
 - Capacity: 500,000 units per month
 - Transport Cost: 1 USD per unit, for Cotton shipped to the plant
-- Local Rules: None
+- Local Rules: Industrial-waste rules require a fixed share of scrap and packaging to be certified-recycled, with per-tonne landfill fees that escalate annually. Production above the approved quota needs a revised waste-management plan.
 
 ### Kyiv Plant (manufactures Polyester textiles for Cotton Garment)
 - Location: Kyiv, Kyiv Oblast, Ukraine
 - Capacity: 300,000 units per month
 - Transport Cost: 1 USD per unit, for Polyester shipped to the plant
-- Local Rules: None
+- Local Rules: Mobilization rules grant manufacturing-critical staff deferrals only on monthly documented proof; missing paperwork shortens line staffing. Energy-rationing schedules confine production to grid windows, limiting continuous shifts.
 
 ## Delivery
 ### Nanjing Distribution Hub (stores Cotton textiles for Cotton Garment)
 - Location: Nanjing, Jiangsu, China
 - Warehouse Cost: 2,200 USD per month
-- Local Rules: None
+- Local Rules: Reverse-logistics mandates require take-back of a fixed share of outbound packaging, with deposit fees on non-recyclable wrapping; single-use pallet pooling limits packaging waste from deliveries.
 
 ### Kyiv Distribution Hub (stores Polyester textiles for Cotton Garment)
 - Location: Kyiv, Kyiv Oblast, Ukraine
 - Warehouse Cost: 1,900 USD per month
-- Local Rules: None
+- Local Rules: Curfew rules halt truck departures after nightfall, and every convoy needs security clearance filed 24 hours ahead; fuel-rationing rules require warehouses to keep reserve storage.

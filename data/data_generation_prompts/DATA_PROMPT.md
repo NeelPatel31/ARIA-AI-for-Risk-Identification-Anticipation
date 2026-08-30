@@ -54,7 +54,7 @@ The location set is closed to China/Ukraine **except** for explicitly documented
 - **Nickel** (alternative Battery raw material for EV Vehicle) is sourced from **Sulawesi, Indonesia** — outside the closed set, on purpose, to give the risk agent a genuine sole-source-outside-safe-zone case to detect. Its data differs from the other materials:
   - Price: 18,500 USD per tonne (priced per tonne, not per unit, matching how nickel actually trades)
   - Export Control Status: Restricted
-  - Stock: Limited (an extra field used only for this material, adding a second risk dimension beyond export control)
+  - Stock: Limited (the floor of the controlled Stock vocabulary in §6; Nickel is the only material at `Limited`, adding a second risk dimension beyond export control)
 
 Do not add further exceptions without documenting them here.
 
@@ -82,10 +82,11 @@ Exclude (structural/taxonomy words, never entities):
 `City, State/Province, Country` for any specific site (plant, warehouse), using only cities/states/countries from the closed set in §2 (except the documented Nickel exception). Each level (city, state, country) is its own separate entity in the `entities` list.
 Country-only sourcing (raw material origin without a specific site) stays as just the country name.
 
-## 6. Controlled vocabularies (don't use free text for these — needed for reliable downstream scoring)
+## 6. Controlled vocabularies and Local Rules (fixed values where scoring depends on them; bounded free text where realism requires it)
 - **Export Control Status**: `Regular | Restricted | Controlled | Banned`
 - **Demand Rating**: `Low | Moderate | High`
-- **Local Rules**: always write `None` explicitly when there are no rules in effect — never omit the line.
+- **Stock**: `High | Medium | Low | Limited` — closed vocabulary, one value per material, and **globally consistent**: the same material carries the same Stock value in every product that uses it (it is a property of the commodity, not the product). Nickel is the only material at `Limited`. Place the line directly after `Export Control Status`.
+- **Local Rules**: free text, but never `None` and never omitted. Write a realistic regulation framed as a protection for nature, people, the public, consumers, or employees that also binds the company — it should constrain expansion, scheduling, emissions, or logistics. Max **50 words**. Reuse the same rule for the same city across products so retrieval stays coherent.
 
 ## 7. Units
 - Currency: `<number> USD per <unit>` (e.g. `200 USD per unit`, `100 USD per tonne`)
@@ -116,6 +117,7 @@ entities: [EV Vehicle, Battery, Lithium, Cobalt, Graphite, Nickel, Steel, Iron, 
 - Production Site: Shenzhen, Guangdong, China
 - Price: 200 USD per unit
 - Export Control Status: Regular
+- Stock: Medium
 
 ### Battery — Nickel Variant (alternative raw material for EV Vehicle)
 - Composition: Nickel
@@ -129,30 +131,31 @@ entities: [EV Vehicle, Battery, Lithium, Cobalt, Graphite, Nickel, Steel, Iron, 
 - Source Locations: China; Ukraine
 - Price: 100 USD per tonne
 - Export Control Status: Regular
+- Stock: High
 
 ## Manufacturing
 ### Shenzhen Plant (manufactures Battery for EV Vehicle)
 - Location: Shenzhen, Guangdong, China
 - Capacity: 50,000 units per month
 - Transport Cost: 15 USD per unit, for Lithium, Cobalt, and Graphite shipped to the plant
-- Local Rules: None
+- Local Rules: Carbon-emissions trading scheme caps annual plant output; exceeding the allowance requires buying permits or funding local abatement projects. Labor law limits weekly overtime, so extra shifts need staggered, approved scheduling.
 
 ### Lviv Plant (manufactures Steel for EV Vehicle)
 - Location: Lviv, Lviv Oblast, Ukraine
 - Capacity: 30,000 tonnes per month
 - Transport Cost: 10 USD per tonne, for Iron shipped to the plant
-- Local Rules: None
+- Local Rules: Martial-law logistics rules require security-cleared shipments and rail-slot bookings through Ukrzaliznytsia; missing clearances halt dispatch. Grid-rationing windows cap plant operating hours, barring round-the-clock output.
 
 ## Delivery
 ### Shenzhen Distribution Hub (stores Battery for EV Vehicle)
 - Location: Shenzhen, Guangdong, China
 - Warehouse Cost: 5,000 USD per month
-- Local Rules: None
+- Local Rules: Fire-zone zoning caps hazardous-material inventory mass and mandates sprinklered, segregated bays; residential proximity buffers prohibit contiguous warehouse expansion.
 
 ### Lviv Distribution Hub (stores Steel for EV Vehicle)
 - Location: Lviv, Lviv Oblast, Ukraine
 - Warehouse Cost: 3,000 USD per month
-- Local Rules: None
+- Local Rules: Transit-terminal access requires security passes renewed monthly, and rail-slot allocations through Ukrzaliznytsia grant westerly hubs priority only at set windows, capping throughput.
 ```
 
 ## 9. Fake news dataset (separate collection)
@@ -265,6 +268,7 @@ event_type: Labor Dispute
 - [ ] `event_type` uses the fixed vocabulary above
 - [ ] `published_date` is present, for recency weighting
 - [ ] At least one news item deliberately targets the Nickel/Indonesia exception, as a high-value test case for the risk agent
+- [ ] Keep event-type coverage roughly balanced across the collection (the current dataset runs `news_0001`–`news_0021`, with 4 in-scope items each of Calamity/Conflict/Policy/Labor/Price plus one deliberate out-of-scope item)
 
 ## 10. Checklist for each new product file
 - [ ] Product, materials, and locations are drawn from the closed sets in §2 (or the documented Nickel exception)
@@ -273,7 +277,7 @@ event_type: Labor Dispute
 - [ ] Every `###` subheader names its entity plus a role parenthetical
 - [ ] Bullets are plain `Field: Value`, no entity name repeated inside them
 - [ ] Locations use City, State/Province, Country
-- [ ] Export Control Status, Demand Rating use the fixed vocabularies in §6
-- [ ] Local Rules always explicit, never omitted
+- [ ] Export Control Status, Demand Rating, and Stock use the fixed vocabularies in §6 (Stock present on every material, one value per material, globally consistent across products)
+- [ ] Local Rules present on every plant and hub, never `None` or omitted, realistic and protective-but-constraining, ≤50 words
 - [ ] Currency/capacity units follow §7 exactly
 - [ ] Reuse the shared hub materials (Steel, Copper) and shared locations across products deliberately, so the graph retriever has real cross-product concentration-risk edges to find
