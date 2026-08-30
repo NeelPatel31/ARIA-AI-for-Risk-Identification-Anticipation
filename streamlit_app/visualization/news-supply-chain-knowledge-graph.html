@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Supply chain risk — knowledge graph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#0E1015; --panel:#171A21; --panel-2:#1D212A; --line:#2A2E38; --line-soft:#22262F;
+    --text:#E9E7DD; --text-dim:#9498A3; --text-mute:#5C606B;
+    --economic:#4C8DFF; --conflict:#E2593C; --calamity:#29A187; --policy:#E0A93D; --labor:#D45C86;
+    --material:#9C8CFF; --location:#6B6F7B; --extended:#3D404A;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  header{padding:28px 32px 20px;border-bottom:1px solid var(--line);}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;color:var(--text-mute);text-transform:uppercase;margin:0 0 6px;}
+  h1{font-family:var(--font-display);font-size:26px;font-weight:600;margin:0 0 4px;letter-spacing:-0.01em;}
+  .sub{color:var(--text-dim);font-size:13px;margin:0;}
+  .stats{display:flex;gap:0;margin-top:20px;border-top:1px solid var(--line);border-left:1px solid var(--line);}
+  .stat{flex:1;padding:14px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .stat .n{font-family:var(--font-display);font-size:22px;font-weight:600;}
+  .stat .l{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+  .layout{display:grid;grid-template-columns:220px 1fr 320px;grid-template-rows:640px;}
+  aside{padding:20px;border-right:1px solid var(--line);height:640px;overflow-y:auto;}
+  aside.right{border-right:none;border-left:1px solid var(--line);}
+  .group-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;color:var(--text-mute);text-transform:uppercase;margin:0 0 10px;}
+  input#search{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:var(--font-body);margin-bottom:22px;}
+  input#search:focus{outline:none;border-color:var(--text-mute);}
+  .chip{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;margin-bottom:2px;color:var(--text-dim);}
+  .chip:hover{background:var(--panel-2);}
+  .chip.off{opacity:0.35;}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .chip .count{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-mute);}
+  main{position:relative;height:640px;overflow:hidden;background:
+    radial-gradient(circle at 1px 1px, var(--line-soft) 1px, transparent 0) 0 0/22px 22px;}
+  #graph{display:block;width:100%;height:100%;cursor:grab;}
+  #graph:active{cursor:grabbing;}
+  .node-label{font-family:var(--font-mono);font-size:9.5px;fill:var(--text-dim);pointer-events:none;}
+  .link{stroke:var(--line);stroke-width:1;}
+  .link.dim{opacity:0.06;}
+  .node{cursor:pointer;stroke:var(--bg);stroke-width:1.5;}
+  .node.dim{opacity:0.1;}
+  .node.selected{stroke:#fff;stroke-width:2;}
+  #detail{padding:20px;overflow-y:auto;max-height:100%;}
+  #detail .placeholder{color:var(--text-mute);font-size:13px;line-height:1.6;}
+  .badge{display:inline-block;font-family:var(--font-mono);font-size:10px;letter-spacing:0.04em;padding:3px 8px;border-radius:4px;margin:0 6px 6px 0;text-transform:uppercase;}
+  .d-title{font-family:var(--font-display);font-size:17px;font-weight:600;margin:10px 0 2px;line-height:1.3;}
+  .d-meta{font-family:var(--font-mono);font-size:11px;color:var(--text-mute);margin-bottom:12px;}
+  .d-summary{font-size:13px;line-height:1.65;color:var(--text-dim);}
+  .d-row{display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--line-soft);}
+  .d-row span:first-child{color:var(--text-mute);}
+  .d-list{font-size:12px;color:var(--text-dim);line-height:1.9;}
+  .d-list a{color:var(--text);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--text-mute);}
+  #timeline{border-top:1px solid var(--line);padding:16px 32px 22px;}
+  #tl-svg{width:100%;overflow:visible;}
+  .tl-event{cursor:pointer;}
+  .tl-axis text{font-family:var(--font-mono);font-size:9.5px;fill:var(--text-mute);}
+  .tl-axis line,.tl-axis path{stroke:var(--line);}
+  footer{padding:14px 32px;border-top:1px solid var(--line);font-family:var(--font-mono);font-size:10.5px;color:var(--text-mute);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Commodity &amp; logistics intelligence</p>
+  <h1>Supply chain risk knowledge graph</h1>
+  <p class="sub">21 tracked events · locations, materials, and market shocks · Jul 14 – Aug 29, 2026</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="layout">
+  <aside class="left">
+    <p class="group-label">Search</p>
+    <input id="search" type="text" placeholder="Search events, materials, places…">
+    <p class="group-label">Event type</p>
+    <div id="type-filters"></div>
+    <p class="group-label" style="margin-top:22px">Scope</p>
+    <div class="chip" id="scope-toggle" style="color:var(--text-dim)">
+      <span class="dot" style="background:var(--extended)"></span>
+      <span>Include extended-scope item</span>
+    </div>
+  </aside>
+
+  <main>
+    <svg id="graph"></svg>
+  </main>
+
+  <aside class="right" id="detail">
+    <div class="placeholder">Click any node to see full details. Drag nodes to rearrange, scroll to zoom, and use the timeline below to jump to a date.</div>
+  </aside>
+</div>
+
+<div id="timeline">
+  <p class="group-label" style="margin-bottom:14px">Timeline — all events by date</p>
+  <svg id="tl-svg" height="90"></svg>
+</div>
+
+<footer>
+  <span>20 core events (China, Ukraine, Indonesia, global commodity markets) + 1 extended-scope item (Brazil / Vietnam coffee)</span>
+  <span>Node size = impact severity</span>
+</footer>
+
+<script>
+const TYPE_COLOR = {
+  "Economic/Price Shock": getComputedStyle(document.documentElement).getPropertyValue('--economic').trim(),
+  "War/Conflict": getComputedStyle(document.documentElement).getPropertyValue('--conflict').trim(),
+  "Natural Calamity": getComputedStyle(document.documentElement).getPropertyValue('--calamity').trim(),
+  "Government Policy": getComputedStyle(document.documentElement).getPropertyValue('--policy').trim(),
+  "Labor Dispute": getComputedStyle(document.documentElement).getPropertyValue('--labor').trim()
+};
+const MATERIAL_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--material').trim();
+const LOCATION_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--location').trim();
+const EXTENDED_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--extended').trim();
+
+const locations = [
+  {id:"L_CHINA", label:"China", kind:"loc"},
+  {id:"L_UKRAINE", label:"Ukraine", kind:"loc"},
+  {id:"L_INDONESIA", label:"Indonesia", kind:"loc"},
+  {id:"L_GLOBAL", label:"Global market", kind:"loc"},
+  {id:"L_BRAZIL", label:"Brazil", kind:"loc", extended:true},
+  {id:"L_VIETNAM", label:"Vietnam", kind:"loc", extended:true}
+];
+const materialNames = ["Copper","Steel","Battery components","Nickel","Zinc","Aluminum","Graphite","Lithium","Cotton","Titanium","Neodymium","Silicon","Iron","Polyester"];
+const materials = materialNames.map(m => ({id:"M_"+m, label:m, kind:"mat"}));
+materials.push({id:"M_Coffee Beans", label:"Coffee Beans", kind:"mat", extended:true});
+
+const events = [
+{id:"E1", label:"Copper price jump", date:"2026-08-04", type:"Economic/Price Shock", loc:["L_GLOBAL"], mat:["Copper"], impact:"Moderate-High",
+  summary:"LME copper up 7% after three smelters (Chile, Asia) cut output by ~8% of global capacity, citing high power costs and falling ore grades. Warehouse stocks at a two-year low. Downstream buyers of copper wire and sheet (smartphones, solar, wind turbines, laptops) are reopening price-adjustment clauses ahead of schedule."},
+{id:"E2", label:"Ukraine logistics disruption", date:"2026-08-10", type:"War/Conflict", loc:["L_UKRAINE"], mat:["Steel","Battery components"], impact:"High",
+  summary:"Shelling near the M06 corridor cut nationwide rail cargo throughput 30%. Freight rerouted through Lviv under 'Operation Steel Corridor'; Lviv/Kyiv shipments delayed 5-10 days. War-risk insurance premiums up 12%."},
+{id:"E3", label:"Shenzhen flash flooding", date:"2026-08-05", type:"Natural Calamity", loc:["L_CHINA"], mat:["Battery components"], impact:"Moderate",
+  summary:"Record overnight downpour flooded Shenzhen's Longgang manufacturing belt. Battery and electronics plants ordered to suspend operations for an estimated 3-5 days. Localized only; the rest of Guangdong is unaffected."},
+{id:"E4", label:"Indonesia nickel export restriction", date:"2026-08-18", type:"Government Policy", loc:["L_INDONESIA"], mat:["Nickel"], impact:"High",
+  summary:"Indonesia now requires all Sulawesi-mined nickel ore to be processed domestically before export, effective next quarter, pushing capacity toward Morowali. Reinforces nickel's already-restricted export status and tightens supply for processors outside Indonesia."},
+{id:"E5", label:"Suzhou copper wire strike", date:"2026-08-22", type:"Labor Dispute", loc:["L_CHINA"], mat:["Copper"], impact:"Moderate",
+  summary:"Workers at two Suzhou copper wire plants walked out over a proposed wage freeze tied to rising copper input costs. Regional copper wire output down ~20%. Nearby Nanjing facilities unaffected; expected to resolve within 1-2 weeks."},
+{id:"E6", label:"Guangzhou Panyu flood", date:"2026-07-14", type:"Natural Calamity", loc:["L_CHINA"], mat:["Aluminum","Zinc","Silicon","Copper","Titanium"], impact:"Moderate-High",
+  summary:"Pearl River overflow flooded Guangzhou's Panyu Industrial Corridor, halting four co-located assembly plants for 4-7 days. Because Panyu hosts solar-panel, bicycle-frame and steel-furniture lines together, the shutdown spans an unusually wide set of materials. Rail freight rerouted via Dongguan, adding ~2 days."},
+{id:"E7", label:"Stryi wildfire shutdown", date:"2026-07-21", type:"Natural Calamity", loc:["L_UKRAINE"], mat:["Steel","Iron"], impact:"Moderate",
+  summary:"A fast-moving Carpathian foothills wildfire came within 3km of Stryi's metalworking district, prompting a precautionary shutdown of steel and iron lines for 3-5 days. Incoming iron ore from Kryvyi Rih held at a siding. Neighboring Lviv operations unaffected."},
+{id:"E8", label:"Sulawesi landslide", date:"2026-07-28", type:"Natural Calamity", loc:["L_INDONESIA"], mat:["Nickel"], impact:"High",
+  summary:"A landslide buried the haul road linking an open-pit nickel mine to processing in Bahodopi District. Ore transport suspended 10-14 days for slope stabilization; ore already mined cannot be rerouted under the domestic-processing mandate. Second Sulawesi nickel disruption this year; regional stockpile buffer ~2 weeks."},
+{id:"E9", label:"Black Sea drone strikes", date:"2026-08-02", type:"War/Conflict", loc:["L_UKRAINE"], mat:["Steel","Polyester"], impact:"High",
+  summary:"Drone strikes near Odesa port infrastructure forced suspension of southern export-corridor loading. Freight rerouted inland to Lviv/Kyiv, adding 6-9 days nationwide. Marine war-risk exclusion zones widened, raising freight premiums for coastal cargo."},
+{id:"E10", label:"Rail bridge strikes", date:"2026-08-09", type:"War/Conflict", loc:["L_UKRAINE"], mat:["Copper","Zinc","Aluminum"], impact:"High",
+  summary:"Two of five Dnipro River rail crossings were structurally damaged, triggering a nationwide freight speed restriction and a cap at 60% of normal weight capacity system-wide. Copper wire, zinc ingot and aluminum sheet shipments to western hubs are most affected; full repair not expected before month end."},
+{id:"E11", label:"Mobilization labor strain", date:"2026-08-13", type:"War/Conflict", loc:["L_UKRAINE"], mat:["Steel","Iron","Polyester"], impact:"Moderate-High",
+  summary:"An expanded mobilization order pulled an estimated 8% of registered manufacturing workers from factory floors nationwide, hitting steel, iron-casting and textile plants hardest — some shift rotations short-staffed by a third. Affects production timelines rather than raw-material availability."},
+{id:"E12", label:"Graphite export licensing", date:"2026-07-17", type:"Government Policy", loc:["L_CHINA"], mat:["Graphite"], impact:"High",
+  summary:"China's Ministry of Commerce now requires individual shipment licenses with declared end-use and destination for battery-grade graphite exports, adding an estimated 2-3 weeks to processing. Applies nationwide to both natural and synthetic anode-grade graphite; domestic consumption is exempt."},
+{id:"E13", label:"Guangdong aluminum emissions cuts", date:"2026-07-24", type:"Government Policy", loc:["L_CHINA"], mat:["Aluminum"], impact:"Moderate",
+  summary:"Guangdong ordered aluminum smelters to cut energy use 15% under an expanded dual-control policy, with curtailments of up to 20% possible for non-compliant smelters by September. Regional only (Guangdong), estimated to cut provincial output by ~60,000 tonnes."},
+{id:"E14", label:"Ukraine zinc export quota", date:"2026-08-06", type:"Government Policy", loc:["L_UKRAINE"], mat:["Zinc"], impact:"Moderate-High",
+  summary:"Ukraine capped zinc exports at 70% of the prior year's volume to build a strategic materials reserve, applying to all destinations. Allocation certificates prioritize long-term contract holders over spot shipments; the quota may tighten further after a six-month review."},
+{id:"E15", label:"Nanjing turbine strike", date:"2026-07-30", type:"Labor Dispute", loc:["L_CHINA"], mat:["Copper","Zinc","Neodymium"], impact:"Moderate",
+  summary:"About 400 workers at a Nanjing plant walked out over a proposal converting overtime pay to comp time, effectively a 12% pay cut. Neodymium magnet assembly (low-volume, high-value) is hit hardest; copper wire processing continues at ~60% via non-striking staff."},
+{id:"E16", label:"Bila Tserkva work stoppage", date:"2026-08-11", type:"Labor Dispute", loc:["L_UKRAINE"], mat:["Aluminum","Zinc"], impact:"Low-Moderate",
+  summary:"Workers refused entry after a ventilation failure went unrepaired over a weekend, with air-quality readings exceeding safety thresholds for two shifts. Aluminum sheet output for solar panel components paused entirely; zinc continues on a secondary line. Expected reopening within 48 hours pending inspection."},
+{id:"E17", label:"Shenzhen chassis dispute", date:"2026-08-16", type:"Labor Dispute", loc:["L_CHINA"], mat:["Titanium","Copper","Aluminum"], impact:"Low-Moderate",
+  summary:"A deliberate work-to-rule slowdown over a stalled skills-based pay tier cut a Shenzhen laptop-chassis line to roughly half capacity. Titanium and aluminum chassis lines are hit hardest, about a week of shipment delay; copper wiring is less affected due to cross-trained staff."},
+{id:"E18", label:"Nickel price surge", date:"2026-08-19", type:"Economic/Price Shock", loc:["L_GLOBAL","L_INDONESIA"], mat:["Nickel"], impact:"High",
+  summary:"LME nickel jumped 9% in a week, the sharpest move in over a year, on compounding Indonesian supply warnings — reduced ore shipments, processing bottlenecks. Battery-grade nickel sulfate premium widened further. Warehouse inventories at a 14-month low; buyers are accelerating qualification of lower-nickel chemistries."},
+{id:"E19", label:"Lithium carbonate futures spike", date:"2026-08-24", type:"Economic/Price Shock", loc:["L_GLOBAL","L_CHINA","L_UKRAINE"], mat:["Lithium"], impact:"Moderate-High",
+  summary:"Lithium carbonate futures rose 11% over five sessions after two major battery-cell makers placed larger-than-forecast orders — a demand shock rather than a supply disruption. Prices for both hydroxide and carbonate hit an 8-month high; expected to ease if planned Chinese processing capacity comes online next quarter."},
+{id:"E20", label:"Cotton futures rally", date:"2026-08-27", type:"Economic/Price Shock", loc:["L_GLOBAL","L_CHINA"], mat:["Cotton","Polyester"], impact:"Moderate",
+  summary:"ICE cotton futures rose 8% after a third consecutive downward crop-yield revision this season, tied to uneven rainfall during boll development. Chinese textile buyers are locking in forward contracts early, and some garment makers are shifting order mix toward polyester blends to offset costs."},
+{id:"E21", label:"Arabica frost damage", date:"2026-08-29", type:"Economic/Price Shock", loc:["L_BRAZIL","L_VIETNAM"], mat:["Coffee Beans"], impact:"High", extended:true,
+  summary:"Arabica futures jumped 13% after an unseasonal frost swept Minas Gerais, damaging an estimated 8-10% of flowering trees ahead of harvest; recovery could take two to three growing seasons for the hardest-hit farms. Roasters are shifting blend ratios toward Vietnamese robusta, pushing robusta prices up in tandem. Extended-scope item: Coffee Beans, Brazil and Vietnam sit outside the core China / Ukraine / Indonesia material set tracked elsewhere in this dataset."}
+];
+
+const allNodes = [...locations, ...materials, ...events.map(e => ({...e}))];
+const nodeById = {};
+allNodes.forEach(n => nodeById[n.id] = n);
+
+const allLinks = [];
+events.forEach(e => {
+  e.loc.forEach(l => allLinks.push({source:l, target:e.id}));
+  e.mat.forEach(m => allLinks.push({source:e.id, target:"M_"+m}));
+});
+
+function impactRadius(imp){
+  if(imp === "High") return 13;
+  if(imp && imp.indexOf("Moderate-High") > -1) return 11.5;
+  if(imp === "Moderate") return 10;
+  return 8.5;
+}
+function nodeRadius(n){
+  if(n.kind === "loc") return 17;
+  if(n.kind === "mat") return 11.5;
+  return impactRadius(n.impact);
+}
+function nodeColor(n){
+  if(n.extended && n.kind !== "event") return EXTENDED_COLOR;
+  if(n.kind === "loc") return LOCATION_COLOR;
+  if(n.kind === "mat") return n.extended ? EXTENDED_COLOR : MATERIAL_COLOR;
+  return TYPE_COLOR[n.type] || "#888";
+}
+
+let activeTypes = new Set(Object.keys(TYPE_COLOR));
+let includeExtended = true;
+let selectedId = null;
+let searchTerm = "";
+
+const statsEl = document.getElementById("stats");
+function renderStats(){
+  const visibleEvents = events.filter(passesFilter);
+  const high = visibleEvents.filter(e => e.impact === "High").length;
+  const dates = visibleEvents.map(e => e.date).sort();
+  statsEl.innerHTML = `
+    <div class="stat"><div class="n">${visibleEvents.length}</div><div class="l">Events shown</div></div>
+    <div class="stat"><div class="n">${new Set(visibleEvents.flatMap(e=>e.mat)).size}</div><div class="l">Materials touched</div></div>
+    <div class="stat"><div class="n">${high}</div><div class="l">High impact</div></div>
+    <div class="stat"><div class="n">${dates.length ? dates[0].slice(5) + ' – ' + dates[dates.length-1].slice(5) : '—'}</div><div class="l">Date range</div></div>
+  `;
+}
+
+function passesFilter(e){
+  if(!activeTypes.has(e.type)) return false;
+  if(!includeExtended && e.extended) return false;
+  if(searchTerm){
+    const hay = (e.label + " " + e.mat.join(" ") + " " + e.loc.map(l=>nodeById[l].label).join(" ") + " " + e.summary).toLowerCase();
+    if(!hay.includes(searchTerm)) return false;
+  }
+  return true;
+}
+
+const typeFiltersEl = document.getElementById("type-filters");
+Object.keys(TYPE_COLOR).forEach(t => {
+  const count = events.filter(e => e.type === t).length;
+  const chip = document.createElement("div");
+  chip.className = "chip";
+  chip.innerHTML = `<span class="dot" style="background:${TYPE_COLOR[t]}"></span><span>${t}</span><span class="count">${count}</span>`;
+  chip.addEventListener("click", () => {
+    if(activeTypes.has(t)) activeTypes.delete(t); else activeTypes.add(t);
+    chip.classList.toggle("off", !activeTypes.has(t));
+    update();
+  });
+  typeFiltersEl.appendChild(chip);
+});
+document.getElementById("scope-toggle").addEventListener("click", function(){
+  includeExtended = !includeExtended;
+  this.classList.toggle("off", !includeExtended);
+  update();
+});
+document.getElementById("search").addEventListener("input", function(){
+  searchTerm = this.value.trim().toLowerCase();
+  update();
+});
+
+const svg = d3.select("#graph");
+const gLinks = svg.append("g").attr("class", "links");
+const gNodes = svg.append("g").attr("class", "nodes");
+const zoomLayer = svg.append("g");
+gLinks.remove(); gNodes.remove();
+const zLinks = zoomLayer.append("g").attr("class", "links");
+const zNodes = zoomLayer.append("g").attr("class", "nodes");
+
+let width = 0, height = 0;
+function sizeSvg(){
+  const rect = document.querySelector("main").getBoundingClientRect();
+  width = rect.width; height = Math.max(rect.height, 560);
+  svg.attr("viewBox", [0,0,width,height]);
+}
+sizeSvg();
+
+const simulation = d3.forceSimulation(allNodes)
+  .force("link", d3.forceLink(allLinks).id(d => d.id).distance(l => {
+    const s = typeof l.source === "object" ? l.source : nodeById[l.source];
+    const t = typeof l.target === "object" ? l.target : nodeById[l.target];
+    return (s.kind === "loc" || t.kind === "loc") ? 130 : 85;
+  }).strength(0.7))
+  .force("charge", d3.forceManyBody().strength(-260))
+  .force("center", d3.forceCenter(width/2, height/2))
+  .force("collide", d3.forceCollide(d => nodeRadius(d) + 14));
+
+const linkSel = zLinks.selectAll("line").data(allLinks).join("line").attr("class","link");
+const nodeSel = zNodes.selectAll("g").data(allNodes).join("g").attr("class","nodeGroup").style("cursor","pointer");
+
+nodeSel.append("circle")
+  .attr("class","node")
+  .attr("r", nodeRadius)
+  .attr("fill", nodeColor);
+nodeSel.append("text")
+  .attr("class","node-label")
+  .attr("text-anchor","middle")
+  .attr("dy", d => nodeRadius(d) + 12)
+  .text(d => d.label.length > 20 ? d.label.slice(0,18)+"…" : d.label);
+
+nodeSel.call(d3.drag()
+  .on("start", (ev,d) => { if(!ev.active) simulation.alphaTarget(0.25).restart(); d.fx=d.x; d.fy=d.y; })
+  .on("drag", (ev,d) => { d.fx=ev.x; d.fy=ev.y; })
+  .on("end", (ev,d) => { if(!ev.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+nodeSel.on("click", (ev,d) => { selectedId = d.id; showDetail(d); update(); });
+
+svg.call(d3.zoom().scaleExtent([0.4,2.5]).on("zoom", ev => zoomLayer.attr("transform", ev.transform)));
+
+simulation.on("tick", () => {
+  linkSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+         .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+function visibleEventIds(){
+  return new Set(events.filter(passesFilter).map(e => e.id));
+}
+function nodeVisible(n, evIds){
+  if(n.kind === "event") return evIds.has(n.id);
+  if(n.kind === "loc") return events.some(e => passesFilter(e) && e.loc.includes(n.id));
+  if(n.kind === "mat") return events.some(e => passesFilter(e) && e.mat.includes(n.label));
+  return true;
+}
+
+function update(){
+  const evIds = visibleEventIds();
+  nodeSel.classed("dim", d => !nodeVisible(d, evIds));
+  nodeSel.classed("selected", d => d.id === selectedId);
+  linkSel.classed("dim", l => {
+    const s = l.source.id ? l.source.id : l.source;
+    const t = l.target.id ? l.target.id : l.target;
+    return !nodeVisible(nodeById[s], evIds) || !nodeVisible(nodeById[t], evIds);
+  });
+  renderStats();
+  renderTimeline();
+}
+
+function showDetail(n){
+  const panel = document.getElementById("detail");
+  if(n.kind === "loc" || n.kind === "mat"){
+    const linked = n.kind === "loc"
+      ? events.filter(e => e.loc.includes(n.id))
+      : events.filter(e => e.mat.includes(n.label));
+    panel.innerHTML = `
+      <span class="badge" style="background:${nodeColor(n)}22;color:${nodeColor(n)}">${n.kind === "loc" ? "Location" : "Material"}</span>
+      <div class="d-title">${n.label}</div>
+      <div class="d-meta">${linked.length} linked event${linked.length !== 1 ? "s" : ""}</div>
+      <div class="d-list">${linked.map(e => `<a onclick='window.__jump("${e.id}")'>${e.label}</a> — ${e.date}`).join("<br>")}</div>
+    `;
+  } else {
+    panel.innerHTML = `
+      <span class="badge" style="background:${nodeColor(n)}22;color:${nodeColor(n)}">${n.type}</span>
+      ${n.extended ? `<span class="badge" style="background:${EXTENDED_COLOR}22;color:#B7BAC4">Extended scope</span>` : ""}
+      <div class="d-title">${n.label}</div>
+      <div class="d-meta">${n.date} · impact: ${n.impact}</div>
+      <div class="d-row"><span>Location</span><span>${n.loc.map(l=>nodeById[l].label).join(", ")}</span></div>
+      <div class="d-row"><span>Materials</span><span>${n.mat.join(", ")}</span></div>
+      <div class="d-summary" style="margin-top:12px">${n.summary}</div>
+    `;
+  }
+}
+window.__jump = function(id){
+  selectedId = id;
+  showDetail(nodeById[id]);
+  update();
+};
+
+function renderTimeline(){
+  const tl = d3.select("#tl-svg");
+  tl.selectAll("*").remove();
+  const w = document.getElementById("timeline").getBoundingClientRect().width;
+  const h = 90, margin = {left:10,right:10,top:10,bottom:24};
+  tl.attr("viewBox", [0,0,w,h]);
+  const parse = d3.timeParse("%Y-%m-%d");
+  const data = events.map(e => ({...e, d: parse(e.date)}));
+  const x = d3.scaleTime().domain(d3.extent(data, d=>d.d)).range([margin.left+10, w-margin.right-10]);
+  const evIds = visibleEventIds();
+  const axis = d3.axisBottom(x).ticks(8).tickFormat(d3.timeFormat("%b %d"));
+  tl.append("g").attr("class","tl-axis").attr("transform",`translate(0,${h-margin.bottom})`).call(axis);
+
+  const jitter = {};
+  data.forEach(d => { jitter[d.date] = (jitter[d.date]||0) + 1; });
+  const seen = {};
+  data.forEach(d => {
+    seen[d.date] = (seen[d.date]||0);
+    d.row = seen[d.date]++;
+  });
+
+  tl.selectAll("circle.tl-event").data(data).join("circle")
+    .attr("class","tl-event")
+    .attr("cx", d => x(d.d))
+    .attr("cy", d => h - margin.bottom - 14 - d.row*13)
+    .attr("r", d => impactRadius(d.impact)*0.6)
+    .attr("fill", d => TYPE_COLOR[d.type])
+    .attr("opacity", d => (activeTypes.has(d.type) && (includeExtended || !d.extended) && evIds.has(d.id)) ? 1 : 0.12)
+    .attr("stroke", d => d.id === selectedId ? "#fff" : "none")
+    .attr("stroke-width", 1.5)
+    .on("click", (ev,d) => window.__jump(d.id));
+}
+
+window.addEventListener("resize", () => { sizeSvg(); simulation.force("center", d3.forceCenter(width/2,height/2)); simulation.alpha(0.3).restart(); renderTimeline(); });
+
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Supply Chain Knowledge Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0F17;
+    --panel:#121926;
+    --panel-2:#0E141F;
+    --border:#232C3D;
+    --text:#E7ECF3;
+    --muted:#8A97AC;
+    --risk:#FF6B4A;
+    --product:#F2B84B;
+    --material:#3FBFAD;
+    --isolated:#A78BFA;
+    --country:#4C8DFF;
+    --state:#7EB2FF;
+    --city:#B8D4FF;
+    --plant:#C08FE0;
+    --warehouse:#5FD08A;
+    --restricted:#FF6B4A;
+    --controlled:#F2B84B;
+    --banned:#FF3B3B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{
+    padding:18px 24px 14px 24px;
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:flex-end;justify-content:space-between;
+    flex-wrap:wrap;gap:12px;
+    background:linear-gradient(180deg,#0D131F 0%, #0B0F17 100%);
+  }
+  header h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;font-size:20px;letter-spacing:0.2px;margin:0;
+    display:flex;align-items:baseline;gap:10px;
+  }
+  header h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--risk);display:inline-block;box-shadow:0 0 8px var(--risk);}
+  header p{margin:4px 0 0 18px;color:var(--muted);font-size:12px;max-width:640px;}
+  .search-wrap{display:flex;align-items:center;gap:10px;}
+  #search{
+    background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:8px 12px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+    width:220px;outline:none;
+  }
+  #search:focus{border-color:var(--material);}
+  #resetBtn{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--muted);
+    padding:8px 12px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;
+  }
+  #resetBtn:hover{color:var(--text);border-color:var(--material);}
+
+  #main{flex:1;display:flex;min-height:0;}
+  #graphWrap{flex:1;position:relative;min-width:0;}
+  svg{width:100%;height:100%;display:block;cursor:grab;}
+  svg:active{cursor:grabbing;}
+
+  .legend{
+    position:absolute;top:14px;left:14px;background:rgba(18,25,38,0.92);
+    border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+    font-size:11px;backdrop-filter:blur(4px);z-index:5;
+  }
+  .legend h3{margin:0 0 8px 0;font-family:'Space Grotesk',sans-serif;font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+  .legend-item{display:flex;align-items:center;gap:8px;padding:3px 4px;border-radius:4px;cursor:pointer;user-select:none;}
+  .legend-item:hover{background:rgba(255,255,255,0.05);}
+  .legend-item.off{opacity:0.3;}
+  .legend-swatch{width:10px;height:10px;border-radius:50%;flex:none;}
+  .legend-item span{color:var(--text);}
+
+  .hint{
+    position:absolute;bottom:14px;left:14px;color:var(--muted);font-size:10.5px;
+    background:rgba(18,25,38,0.85);border:1px solid var(--border);border-radius:6px;padding:8px 10px;
+    max-width:280px;line-height:1.5;z-index:5;
+  }
+  .hint b{color:var(--text);}
+
+  #sidepanel{
+    width:340px;flex:none;border-left:1px solid var(--border);background:var(--panel-2);
+    overflow-y:auto;padding:0;
+  }
+  #sidepanel::-webkit-scrollbar{width:6px;}
+  #sidepanel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+  .panel-empty{padding:40px 24px;color:var(--muted);font-size:12px;line-height:1.7;text-align:center;}
+  .panel-empty .big{font-size:28px;display:block;margin-bottom:10px;}
+
+  .panel-head{padding:20px 22px 14px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel-2);}
+  .type-badge{
+    display:inline-block;font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;
+    padding:3px 8px;border-radius:20px;font-weight:600;margin-bottom:10px;
+    border:1px solid currentColor;
+  }
+  .panel-head h2{margin:0;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;color:var(--text);line-height:1.3;}
+
+  .panel-section{padding:16px 22px;border-bottom:1px solid var(--border);}
+  .panel-section h4{margin:0 0 10px 0;font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:600;}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:12px;border-bottom:1px dashed rgba(255,255,255,0.06);}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{color:var(--muted);}
+  .kv .v{color:var(--text);text-align:right;}
+  .tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;margin-left:6px;font-weight:600;}
+  .tag.Regular{background:rgba(95,208,138,0.15);color:var(--warehouse);}
+  .tag.Controlled{background:rgba(242,184,75,0.15);color:var(--controlled);}
+  .tag.Restricted{background:rgba(255,107,74,0.15);color:var(--restricted);}
+  .tag.Banned{background:rgba(255,59,59,0.15);color:var(--banned);}
+  .tag.High{background:rgba(255,107,74,0.15);color:var(--risk);}
+  .tag.Moderate{background:rgba(242,184,75,0.15);color:var(--controlled);}
+  .tag.Low{background:rgba(140,150,165,0.15);color:var(--muted);}
+
+  .usage-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+  .usage-card .prod{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;color:var(--product);margin-bottom:6px;display:block;}
+  .drivers p{font-size:11.5px;line-height:1.6;color:var(--text);margin:0 0 10px 0;}
+  .drivers .label{color:var(--muted);display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px;}
+
+  .conn-group{margin-bottom:12px;}
+  .conn-group .rel{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;}
+  .conn-chip{
+    display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--border);
+    padding:4px 9px;border-radius:20px;font-size:11px;margin:0 5px 5px 0;cursor:pointer;
+  }
+  .conn-chip:hover{border-color:var(--material);color:var(--material);}
+  .conn-dot{width:6px;height:6px;border-radius:50%;flex:none;}
+
+  .node-label{fill:var(--text);font-family:'IBM Plex Mono',monospace;pointer-events:none;}
+  .link{stroke-opacity:0.35;}
+  .node-circle{cursor:pointer;stroke:rgba(0,0,0,0.4);stroke-width:1px;}
+  .node-circle.dim, .link.dim, .node-label.dim{opacity:0.08;}
+  .node-circle.hi{stroke:#fff;stroke-width:2px;}
+  .node-circle.selected{stroke:#fff;stroke-width:2.5px;}
+
+  @keyframes pulseGlow{
+    0%,100%{filter:drop-shadow(0 0 2px currentColor);}
+    50%{filter:drop-shadow(0 0 8px currentColor);}
+  }
+  .node-circle.hub-glow{animation:pulseGlow 2.4s ease-in-out infinite;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1><span class="dot"></span>Supply Chain Knowledge Graph</h1>
+      <p>8 products &middot; 15 raw materials &middot; China / Ukraine sourcing network &middot; one documented outside-zone exception (Nickel). Steel and Copper are cross-product concentration hubs; Cotton, Polyester and Neodymium are isolated single-product nodes.</p>
+    </div>
+    <div class="search-wrap">
+      <input id="search" type="text" placeholder="Search node…" autocomplete="off">
+      <button id="resetBtn">Reset view</button>
+    </div>
+  </header>
+  <div id="main">
+    <div id="graphWrap">
+      <svg id="svg"></svg>
+      <div class="legend" id="legend"><h3>Layers</h3></div>
+      <div class="hint"><b>Click</b> a node for full details in the side panel. <b>Drag</b> to reposition, <b>scroll</b> to zoom, <b>click a legend row</b> to hide/show a layer.</div>
+    </div>
+    <div id="sidepanel"><div class="panel-empty"><span class="big">◎</span>Click any node — a product, material, country, plant or warehouse — to see everything the dataset holds about it.</div></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   1. SOURCE-OF-TRUTH DATA — transcribed directly from the
+      8 product markdown files
+   ========================================================= */
+
+const products = [
+  { id:'EV Vehicle', seasonal:'Peaks in Q4 due to year-end purchase incentives and tax-credit deadlines',
+    calamity:'Flooding in a key manufacturing region can suppress short-term demand while spiking long-term replacement demand',
+    manmade:'War or a new government EV subsidy policy can rapidly shift demand up or down', rating:'Moderate' },
+  { id:'Smartphone', seasonal:'Peaks around major holiday shopping seasons and new model launch cycles',
+    calamity:'Earthquakes or typhoons near major fabrication hubs can halt chip supply for weeks',
+    manmade:'Export restrictions on semiconductor manufacturing equipment can delay production ramp-ups', rating:'High' },
+  { id:'Solar Panel', seasonal:'Higher installation demand in spring and summer construction seasons',
+    calamity:'Hailstorms and extreme heat events increase demand for panel replacement and upgrades',
+    manmade:'Government renewable energy subsidies and tariffs on imported panels shift demand sharply', rating:'High' },
+  { id:'Bicycle', seasonal:'Peaks in spring and summer as outdoor cycling activity increases',
+    calamity:'Fuel price spikes from regional conflicts can boost demand for bicycles as alternative transport',
+    manmade:'Urban cycling infrastructure investment and commuter subsidy programs increase demand', rating:'Moderate' },
+  { id:'Cotton Garment', seasonal:'Peaks ahead of back-to-school and winter clothing seasons',
+    calamity:'Droughts in cotton-growing regions reduce raw cotton yield and raise costs',
+    manmade:'Trade tariffs on textile imports and shifting fast-fashion trends affect order volumes', rating:'Moderate' },
+  { id:'Laptop', seasonal:'Peaks during back-to-school season and end-of-year enterprise refresh cycles',
+    calamity:'Flooding at chip fabrication sites can delay processor and battery supply for months',
+    manmade:'Export controls on advanced semiconductor manufacturing equipment slow production capacity growth', rating:'High' },
+  { id:'Wind Turbine', seasonal:'Installation activity peaks in summer months due to favorable weather for construction',
+    calamity:'Severe storms can damage existing turbines, temporarily increasing replacement demand',
+    manmade:'National renewable energy targets and grid subsidy programs strongly influence order volume', rating:'High' },
+  { id:'Steel Furniture', seasonal:'Demand rises during office relocation and renovation seasons, typically in Q1 and Q3',
+    calamity:'Fires or floods damaging commercial properties drive short-term replacement demand',
+    manmade:'Corporate return-to-office mandates and commercial construction booms increase order volume', rating:'Low' },
+];
+
+const materials = [
+  { id:'Lithium', hub:false, isolated:false },
+  { id:'Cobalt', hub:false, isolated:false },
+  { id:'Graphite', hub:false, isolated:false },
+  { id:'Nickel', hub:false, isolated:false, exception:true },
+  { id:'Steel', hub:true, isolated:false },
+  { id:'Sulfuric Acid', hub:false, isolated:false },
+  { id:'Silicon', hub:false, isolated:false },
+  { id:'Copper', hub:true, isolated:false },
+  { id:'Aluminum', hub:false, isolated:false },
+  { id:'Zinc', hub:false, isolated:false },
+  { id:'Titanium', hub:false, isolated:false },
+  { id:'Iron', hub:false, isolated:false },
+  { id:'Cotton', hub:false, isolated:true },
+  { id:'Polyester', hub:false, isolated:true },
+  { id:'Neodymium', hub:false, isolated:true },
+];
+
+// material usage records — exactly as written in each product's Sourcing section
+const usage = [
+  // EV Vehicle
+  { material:'Lithium', product:'EV Vehicle', composition:'Lithium, Cobalt, Graphite', source:['Ukraine','China'], price:'200 USD per unit', exportStatus:'Regular' },
+  { material:'Cobalt', product:'EV Vehicle', composition:'Lithium, Cobalt, Graphite', source:['Ukraine','China'], price:'200 USD per unit', exportStatus:'Regular' },
+  { material:'Graphite', product:'EV Vehicle', composition:'Lithium, Cobalt, Graphite', source:['Ukraine','China'], price:'200 USD per unit', exportStatus:'Regular' },
+  { material:'Nickel', product:'EV Vehicle', composition:'Nickel (alternative Battery raw material)', source:['Indonesia'], site:'Sulawesi, Indonesia', price:'18,500 USD per tonne', exportStatus:'Restricted', extra:'Stock: Limited' },
+  { material:'Steel', product:'EV Vehicle', composition:'Iron', source:['China','Ukraine'], price:'100 USD per tonne', exportStatus:'Regular' },
+  // Smartphone
+  { material:'Lithium', product:'Smartphone', composition:'Lithium, Cobalt, Graphite', source:['China','Ukraine'], price:'25 USD per unit', exportStatus:'Regular' },
+  { material:'Cobalt', product:'Smartphone', composition:'Lithium, Cobalt, Graphite', source:['China','Ukraine'], price:'25 USD per unit', exportStatus:'Regular' },
+  { material:'Graphite', product:'Smartphone', composition:'Lithium, Cobalt, Graphite', source:['China','Ukraine'], price:'25 USD per unit', exportStatus:'Regular' },
+  { material:'Sulfuric Acid', product:'Smartphone', composition:'Sulfuric Acid', source:['China'], price:'8 USD per unit', exportStatus:'Regular' },
+  { material:'Silicon', product:'Smartphone', composition:'Silicon', source:['China'], price:'40 USD per unit', exportStatus:'Controlled' },
+  { material:'Copper', product:'Smartphone', composition:'Copper', source:['China','Ukraine'], price:'12 USD per unit', exportStatus:'Regular' },
+  // Solar Panel
+  { material:'Silicon', product:'Solar Panel', composition:'Silicon', source:['China'], price:'30 USD per unit', exportStatus:'Controlled' },
+  { material:'Copper', product:'Solar Panel', composition:'Copper', source:['China','Ukraine'], price:'12 USD per unit', exportStatus:'Regular' },
+  { material:'Aluminum', product:'Solar Panel', composition:'Aluminum', source:['China','Ukraine'], price:'18 USD per unit', exportStatus:'Regular' },
+  { material:'Zinc', product:'Solar Panel', composition:'Zinc', source:['Ukraine'], price:'22 USD per unit', exportStatus:'Regular' },
+  // Bicycle
+  { material:'Steel', product:'Bicycle', composition:'Iron', source:['China','Ukraine'], price:'90 USD per tonne', exportStatus:'Regular' },
+  { material:'Iron', product:'Bicycle', composition:'Iron', source:['Ukraine'], price:'60 USD per tonne', exportStatus:'Regular' },
+  { material:'Aluminum', product:'Bicycle', composition:'Aluminum', source:['China'], price:'18 USD per unit', exportStatus:'Regular' },
+  { material:'Titanium', product:'Bicycle', composition:'Titanium', source:['China'], price:'55 USD per unit', exportStatus:'Controlled' },
+  // Cotton Garment
+  { material:'Cotton', product:'Cotton Garment', composition:'Cotton', source:['China'], price:'3 USD per unit', exportStatus:'Regular' },
+  { material:'Polyester', product:'Cotton Garment', composition:'Polyester', source:['Ukraine'], price:'2 USD per unit', exportStatus:'Regular' },
+  // Laptop
+  { material:'Lithium', product:'Laptop', composition:'Lithium', source:['China'], price:'20 USD per unit', exportStatus:'Regular' },
+  { material:'Silicon', product:'Laptop', composition:'Silicon', source:['China'], price:'45 USD per unit', exportStatus:'Controlled' },
+  { material:'Copper', product:'Laptop', composition:'Copper', source:['China','Ukraine'], price:'12 USD per unit', exportStatus:'Regular' },
+  { material:'Aluminum', product:'Laptop', composition:'Aluminum', source:['China'], price:'16 USD per unit', exportStatus:'Regular' },
+  { material:'Titanium', product:'Laptop', composition:'Titanium', source:['China'], price:'58 USD per unit', exportStatus:'Controlled' },
+  // Wind Turbine
+  { material:'Steel', product:'Wind Turbine', composition:'Iron', source:['China','Ukraine'], price:'110 USD per tonne', exportStatus:'Regular' },
+  { material:'Copper', product:'Wind Turbine', composition:'Copper', source:['China','Ukraine'], price:'12 USD per unit', exportStatus:'Regular' },
+  { material:'Zinc', product:'Wind Turbine', composition:'Zinc', source:['China'], price:'21 USD per unit', exportStatus:'Regular' },
+  { material:'Neodymium', product:'Wind Turbine', composition:'Neodymium', source:['China'], price:'65,000 USD per tonne', exportStatus:'Controlled' },
+  // Steel Furniture
+  { material:'Steel', product:'Steel Furniture', composition:'Iron', source:['China','Ukraine'], price:'95 USD per tonne', exportStatus:'Regular' },
+  { material:'Iron', product:'Steel Furniture', composition:'Iron', source:['Ukraine'], price:'58 USD per tonne', exportStatus:'Regular' },
+  { material:'Zinc', product:'Steel Furniture', composition:'Zinc', source:['China'], price:'20 USD per unit', exportStatus:'Regular' },
+];
+
+// location hierarchy (closed set)
+const countries = ['China','Ukraine','Indonesia'];
+const states = [
+  { id:'Guangdong', country:'China' }, { id:'Jiangsu', country:'China' },
+  { id:'Kyiv Oblast', country:'Ukraine' }, { id:'Lviv Oblast', country:'Ukraine' },
+];
+const cities = [
+  { id:'Shenzhen', state:'Guangdong' }, { id:'Guangzhou', state:'Guangdong' },
+  { id:'Suzhou', state:'Jiangsu' }, { id:'Nanjing', state:'Jiangsu' },
+  { id:'Kyiv', state:'Kyiv Oblast' }, { id:'Bila Tserkva', state:'Kyiv Oblast' },
+  { id:'Lviv', state:'Lviv Oblast' }, { id:'Stryi', state:'Lviv Oblast' },
+  { id:'Sulawesi', country:'Indonesia' },
+];
+
+const plants = [
+  { product:'EV Vehicle', city:'Shenzhen', materials:['Lithium','Cobalt','Graphite'], capacity:'50,000 units per month', transport:'15 USD per unit' },
+  { product:'EV Vehicle', city:'Lviv', materials:['Steel'], capacity:'30,000 tonnes per month', transport:'10 USD per tonne' },
+  { product:'Smartphone', city:'Suzhou', materials:['Lithium','Cobalt','Graphite','Sulfuric Acid'], capacity:'200,000 units per month', transport:'3 USD per unit' },
+  { product:'Smartphone', city:'Nanjing', materials:['Silicon','Copper'], capacity:'180,000 units per month', transport:'4 USD per unit' },
+  { product:'Solar Panel', city:'Guangzhou', materials:['Silicon','Copper'], capacity:'60,000 units per month', transport:'6 USD per unit' },
+  { product:'Solar Panel', city:'Bila Tserkva', materials:['Aluminum','Zinc'], capacity:'40,000 units per month', transport:'7 USD per unit' },
+  { product:'Bicycle', city:'Guangzhou', materials:['Aluminum','Titanium'], capacity:'25,000 units per month', transport:'9 USD per unit' },
+  { product:'Bicycle', city:'Stryi', materials:['Steel','Iron'], capacity:'15,000 tonnes per month', transport:'7 USD per tonne' },
+  { product:'Cotton Garment', city:'Nanjing', materials:['Cotton'], capacity:'500,000 units per month', transport:'1 USD per unit' },
+  { product:'Cotton Garment', city:'Kyiv', materials:['Polyester'], capacity:'300,000 units per month', transport:'1 USD per unit' },
+  { product:'Laptop', city:'Suzhou', materials:['Lithium','Silicon'], capacity:'120,000 units per month', transport:'5 USD per unit' },
+  { product:'Laptop', city:'Shenzhen', materials:['Copper','Aluminum','Titanium'], capacity:'100,000 units per month', transport:'6 USD per unit' },
+  { product:'Wind Turbine', city:'Lviv', materials:['Steel'], capacity:'5,000 tonnes per month', transport:'15 USD per tonne' },
+  { product:'Wind Turbine', city:'Nanjing', materials:['Copper','Zinc','Neodymium'], capacity:'600 units per month', transport:'25 USD per unit' },
+  { product:'Steel Furniture', city:'Guangzhou', materials:['Zinc'], capacity:'40,000 units per month', transport:'8 USD per unit' },
+  { product:'Steel Furniture', city:'Bila Tserkva', materials:['Steel','Iron'], capacity:'20,000 tonnes per month', transport:'6 USD per tonne' },
+];
+
+const warehouses = [
+  { product:'EV Vehicle', city:'Shenzhen', materials:['Lithium','Cobalt','Graphite'], cost:'5,000 USD per month' },
+  { product:'EV Vehicle', city:'Lviv', materials:['Steel'], cost:'3,000 USD per month' },
+  { product:'Smartphone', city:'Suzhou', materials:['Lithium','Cobalt','Graphite','Sulfuric Acid'], cost:'4,200 USD per month' },
+  { product:'Smartphone', city:'Nanjing', materials:['Silicon','Copper'], cost:'3,800 USD per month' },
+  { product:'Solar Panel', city:'Guangzhou', materials:['Silicon','Copper'], cost:'3,500 USD per month' },
+  { product:'Solar Panel', city:'Bila Tserkva', materials:['Aluminum','Zinc'], cost:'2,900 USD per month' },
+  { product:'Bicycle', city:'Guangzhou', materials:['Aluminum','Titanium'], cost:'2,800 USD per month' },
+  { product:'Bicycle', city:'Stryi', materials:['Steel','Iron'], cost:'2,100 USD per month' },
+  { product:'Cotton Garment', city:'Nanjing', materials:['Cotton'], cost:'2,200 USD per month' },
+  { product:'Cotton Garment', city:'Kyiv', materials:['Polyester'], cost:'1,900 USD per month' },
+  { product:'Laptop', city:'Suzhou', materials:['Lithium','Silicon'], cost:'4,000 USD per month' },
+  { product:'Laptop', city:'Shenzhen', materials:['Copper','Aluminum','Titanium'], cost:'3,700 USD per month' },
+  { product:'Wind Turbine', city:'Lviv', materials:['Steel'], cost:'6,000 USD per month' },
+  { product:'Wind Turbine', city:'Nanjing', materials:['Copper','Zinc','Neodymium'], cost:'5,500 USD per month' },
+  { product:'Steel Furniture', city:'Guangzhou', materials:['Zinc'], cost:'3,000 USD per month' },
+  { product:'Steel Furniture', city:'Bila Tserkva', materials:['Steel','Iron'], cost:'2,400 USD per month' },
+];
+
+/* =========================================================
+   2. BUILD NODES + EDGES
+   ========================================================= */
+const nodes = [], links = [];
+const nid = (type,name) => type+'::'+name;
+const nodeById = {};
+function addNode(type,name,extra){
+  const id = nid(type,name);
+  if(!nodeById[id]){
+    const n = Object.assign({id,type,name},extra||{});
+    nodeById[id]=n; nodes.push(n);
+  }
+  return nodeById[id];
+}
+function addLink(a,b,kind){ links.push({source:a,target:b,kind}); }
+
+products.forEach(p=>addNode('product',p.id,{detail:p}));
+materials.forEach(m=>addNode('material',m.id,{detail:m}));
+countries.forEach(c=>addNode('country',c));
+states.forEach(s=>addNode('state',s.id,{parent:s.country}));
+cities.forEach(c=>addNode('city',c.id,{parentState:c.state,parentCountry:c.country}));
+
+// location hierarchy
+states.forEach(s=> addLink(nid('country',s.country), nid('state',s.id), 'contains') );
+cities.forEach(c=>{
+  if(c.state) addLink(nid('state',c.state), nid('city',c.id), 'contains');
+  else if(c.country) addLink(nid('country',c.country), nid('city',c.id), 'contains');
+});
+
+// Steel is composed of Iron
+addLink(nid('material','Steel'), nid('material','Iron'), 'composed_of');
+
+// usage -> uses + sourced_from
+usage.forEach(u=>{
+  addLink(nid('material',u.material), nid('product',u.product), 'uses');
+  u.source.forEach(src=>{
+    addLink(nid('material',u.material), nid('country',src), 'sourced_from');
+  });
+});
+
+// plants
+plants.forEach(pl=>{
+  const plId = nid('plant', pl.product+' — '+pl.city+' Plant');
+  addNode('plant', pl.product+' — '+pl.city+' Plant', {detail:pl});
+  addLink(plId, nid('city',pl.city), 'located_in');
+  addLink(plId, nid('product',pl.product), 'manufactures');
+  pl.materials.forEach(m=> addLink(plId, nid('material',m), 'processes') );
+});
+
+// warehouses
+warehouses.forEach(w=>{
+  const wId = nid('warehouse', w.product+' — '+w.city+' Distribution Hub');
+  addNode('warehouse', w.product+' — '+w.city+' Distribution Hub', {detail:w});
+  addLink(wId, nid('city',w.city), 'located_in');
+  addLink(wId, nid('product',w.product), 'stores_for');
+  w.materials.forEach(m=> addLink(wId, nid('material',m), 'stores_material') );
+});
+
+// degree count for sizing
+const degree = {};
+links.forEach(l=>{ degree[l.source]=(degree[l.source]||0)+1; degree[l.target]=(degree[l.target]||0)+1; });
+
+const TYPE_COLOR = {
+  product:'var(--product)', material:'var(--material)', country:'var(--country)',
+  state:'var(--state)', city:'var(--city)', plant:'var(--plant)', warehouse:'var(--warehouse)'
+};
+function resolveColor(cssVar){
+  return getComputedStyle(document.documentElement).getPropertyValue(cssVar.replace('var(','').replace(')','')).trim();
+}
+const COLOR = {}; Object.keys(TYPE_COLOR).forEach(k=>COLOR[k]=resolveColor(TYPE_COLOR[k]));
+
+function colorFor(n){
+  if(n.type==='material'){
+    if(n.detail.hub) return resolveColor('var(--risk)');
+    if(n.detail.isolated) return resolveColor('var(--isolated)');
+    return COLOR.material;
+  }
+  return COLOR[n.type];
+}
+function baseRadius(n){
+  const d = degree[n.id]||1;
+  if(n.type==='product') return 16;
+  if(n.type==='material') return Math.min(26, 8 + d*1.6);
+  if(n.type==='country') return 20;
+  if(n.type==='state') return 13;
+  if(n.type==='city') return 9;
+  if(n.type==='plant') return 7;
+  if(n.type==='warehouse') return 7;
+  return 8;
+}
+nodes.forEach(n=>{ n.color = colorFor(n); n.r = baseRadius(n); });
+
+/* =========================================================
+   3. LEGEND
+   ========================================================= */
+const legendDef = [
+  {type:'product', label:'Product', color:COLOR.product},
+  {type:'material', label:'Raw material', color:COLOR.material},
+  {type:'materialHub', label:'Hub material (Steel / Copper)', color:resolveColor('var(--risk)')},
+  {type:'materialIso', label:'Isolated material', color:resolveColor('var(--isolated)')},
+  {type:'country', label:'Country', color:COLOR.country},
+  {type:'state', label:'State / Oblast', color:COLOR.state},
+  {type:'city', label:'City', color:COLOR.city},
+  {type:'plant', label:'Manufacturing plant', color:COLOR.plant},
+  {type:'warehouse', label:'Distribution hub', color:COLOR.warehouse},
+];
+const activeTypes = new Set(legendDef.map(d=>d.type));
+const legendEl = document.getElementById('legend');
+legendDef.forEach(d=>{
+  const row = document.createElement('div');
+  row.className='legend-item'; row.dataset.type=d.type;
+  row.innerHTML = `<span class="legend-swatch" style="background:${d.color}"></span><span>${d.label}</span>`;
+  row.addEventListener('click',()=>{
+    if(activeTypes.has(d.type)){ activeTypes.delete(d.type); row.classList.add('off'); }
+    else { activeTypes.add(d.type); row.classList.remove('off'); }
+    applyFilter();
+  });
+  legendEl.appendChild(row);
+});
+function typeKeyFor(n){
+  if(n.type==='material'){
+    if(n.detail.hub) return 'materialHub';
+    if(n.detail.isolated) return 'materialIso';
+    return 'material';
+  }
+  return n.type;
+}
+
+/* =========================================================
+   4. D3 FORCE SIMULATION
+   ========================================================= */
+const svg = d3.select('#svg');
+const gRoot = svg.append('g');
+const gLinks = gRoot.append('g').attr('class','links');
+const gNodes = gRoot.append('g').attr('class','nodes');
+const gLabels = gRoot.append('g').attr('class','labels');
+
+function size(){
+  const wrap = document.getElementById('graphWrap');
+  return {w:wrap.clientWidth, h:wrap.clientHeight};
+}
+let {w,h} = size();
+svg.attr('viewBox',[0,0,w,h]);
+
+const zoom = d3.zoom().scaleExtent([0.15,4]).on('zoom', (ev)=> gRoot.attr('transform', ev.transform));
+svg.call(zoom);
+
+const LINK_COLOR = {
+  uses: '#3FBFAD', sourced_from:'#4C8DFF', contains:'#39435A',
+  composed_of:'#FF6B4A', manufactures:'#C08FE0', processes:'#C08FE0',
+  located_in:'#39435A', stores_for:'#5FD08A', stores_material:'#5FD08A'
+};
+
+const simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d=>d.id).distance(l=>{
+    if(l.kind==='contains') return 55;
+    if(l.kind==='sourced_from') return 90;
+    if(l.kind==='uses') return 110;
+    return 70;
+  }).strength(0.55))
+  .force('charge', d3.forceManyBody().strength(-220))
+  .force('center', d3.forceCenter(w/2, h/2))
+  .force('collide', d3.forceCollide().radius(d=>d.r+14));
+
+const link = gLinks.selectAll('line').data(links).join('line')
+  .attr('class','link')
+  .attr('stroke', d=>LINK_COLOR[d.kind]||'#333')
+  .attr('stroke-width', d=> d.kind==='uses'?1.6:1);
+
+const node = gNodes.selectAll('circle').data(nodes).join('circle')
+  .attr('class', d=> 'node-circle' + ((d.type==='material'&&d.detail.hub) ? ' hub-glow' : ''))
+  .attr('r', d=>d.r)
+  .attr('fill', d=>d.color)
+  .style('color', d=>d.color)
+  .call(d3.drag()
+    .on('start',(ev,d)=>{ if(!ev.active) simulation.alphaTarget(0.25).restart(); d.fx=d.x; d.fy=d.y; })
+    .on('drag',(ev,d)=>{ d.fx=ev.x; d.fy=ev.y; })
+    .on('end',(ev,d)=>{ if(!ev.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }))
+  .on('click',(ev,d)=>{ ev.stopPropagation(); selectNode(d); })
+  .on('mouseenter',(ev,d)=> hoverHighlight(d))
+  .on('mouseleave',()=> { if(!selected) clearHighlight(); else highlightFrom(selected); });
+
+const label = gLabels.selectAll('text').data(nodes).join('text')
+  .attr('class','node-label')
+  .attr('font-size', d=> d.type==='product' ? 11 : d.type==='country' ? 10.5 : 9)
+  .attr('font-weight', d=> (d.type==='product'||d.type==='country') ? 600:400)
+  .attr('dy', d=> -(d.r+5))
+  .attr('text-anchor','middle')
+  .text(d=> d.type==='plant' ? d.name.split(' — ')[1].replace(' Plant','') :
+            d.type==='warehouse' ? d.name.split(' — ')[1].replace(' Distribution Hub','') :
+            d.name);
+
+simulation.on('tick', ()=>{
+  link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  node.attr('cx',d=>d.x).attr('cy',d=>d.y);
+  label.attr('x',d=>d.x).attr('y',d=>d.y);
+});
+
+svg.on('click', ()=>{ selected=null; clearHighlight(); showEmptyPanel(); });
+
+window.addEventListener('resize', ()=>{
+  const s = size(); w=s.w; h=s.h;
+  svg.attr('viewBox',[0,0,w,h]);
+  simulation.force('center', d3.forceCenter(w/2,h/2));
+  simulation.alpha(0.3).restart();
+});
+
+/* =========================================================
+   5. NEIGHBOR INDEX + HIGHLIGHT
+   ========================================================= */
+const neighborIndex = {};
+nodes.forEach(n=> neighborIndex[n.id]=[]);
+links.forEach(l=>{
+  neighborIndex[l.source.id||l.source].push({id:l.target.id||l.target, kind:l.kind, dir:'out'});
+  neighborIndex[l.target.id||l.target].push({id:l.source.id||l.source, kind:l.kind, dir:'in'});
+});
+
+let selected=null;
+
+function hoverHighlight(d){ if(!selected) highlightFrom(d); }
+function clearHighlight(){
+  node.classed('dim',false).classed('hi',false);
+  link.classed('dim',false);
+  label.classed('dim',false);
+}
+function highlightFrom(d){
+  const ids = new Set([d.id, ...neighborIndex[d.id].map(x=>x.id)]);
+  node.classed('dim', n=>!ids.has(n.id)).classed('hi', n=>n.id===d.id);
+  link.classed('dim', l=> !(((l.source.id||l.source)===d.id) || ((l.target.id||l.target)===d.id)));
+  label.classed('dim', n=>!ids.has(n.id));
+}
+
+/* =========================================================
+   6. FILTER (legend toggles) + SEARCH
+   ========================================================= */
+function applyFilter(){
+  const hiddenIds = new Set(nodes.filter(n=>!activeTypes.has(typeKeyFor(n))).map(n=>n.id));
+  node.style('display', n=> hiddenIds.has(n.id) ? 'none':null);
+  label.style('display', n=> hiddenIds.has(n.id) ? 'none':null);
+  link.style('display', l=> (hiddenIds.has(l.source.id||l.source) || hiddenIds.has(l.target.id||l.target)) ? 'none':null);
+}
+
+document.getElementById('search').addEventListener('input', (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(!q){ clearHighlight(); if(selected) highlightFrom(selected); return; }
+  const matches = new Set(nodes.filter(n=>n.name.toLowerCase().includes(q)).map(n=>n.id));
+  node.classed('dim', n=>!matches.has(n.id)).classed('hi', n=>matches.has(n.id));
+  label.classed('dim', n=>!matches.has(n.id));
+  link.classed('dim', l=> !(matches.has(l.source.id||l.source) && matches.has(l.target.id||l.target)));
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  document.getElementById('search').value='';
+  selected=null; clearHighlight(); showEmptyPanel();
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  activeTypes.clear(); legendDef.forEach(d=>activeTypes.add(d.type));
+  document.querySelectorAll('.legend-item').forEach(el=>el.classList.remove('off'));
+  applyFilter();
+});
+
+/* =========================================================
+   7. SIDE PANEL
+   ========================================================= */
+const panel = document.getElementById('sidepanel');
+function showEmptyPanel(){
+  panel.innerHTML = `<div class="panel-empty"><span class="big">◎</span>Click any node — a product, material, country, plant or warehouse — to see everything the dataset holds about it.</div>`;
+}
+function tag(val){ return `<span class="tag ${val}">${val}</span>`; }
+function esc(s){ return (s+''); }
+
+function connGroups(nodeId){
+  const groups = {};
+  neighborIndex[nodeId].forEach(nb=>{
+    const other = nodeById[nb.id];
+    const key = relLabel(nb.kind, nb.dir, other.type);
+    groups[key] = groups[key]||[];
+    if(!groups[key].some(x=>x.id===other.id)) groups[key].push(other);
+  });
+  return groups;
+}
+function relLabel(kind,dir,otherType){
+  const map = {
+    uses: dir==='out' ? 'Used in' : 'Uses material',
+    sourced_from: dir==='out' ? 'Sourced from' : 'Sources this material',
+    contains: dir==='out' ? 'Contains' : 'Located within',
+    composed_of: dir==='out' ? 'Composed of' : 'Component of',
+    manufactures: dir==='out' ? 'Manufactures' : 'Manufactured at',
+    processes: dir==='out' ? 'Processes material' : 'Processed at',
+    located_in: 'Located in',
+    stores_for: dir==='out' ? 'Stores for product' : 'Stored at',
+    stores_material: dir==='out' ? 'Stores material' : 'Stored at',
+  };
+  return map[kind] || kind;
+}
+
+function selectNode(d){
+  selected = d;
+  highlightFrom(d);
+  renderPanel(d);
+}
+
+function renderPanel(d){
+  let html = '';
+  const color = d.color;
+  html += `<div class="panel-head" style="color:${color}">
+    <span class="type-badge">${labelForType(d)}</span>
+    <h2 style="color:var(--text)">${esc(d.type==='plant'? d.name.split(' — ')[1] : d.type==='warehouse' ? d.name.split(' — ')[1] : d.name)}</h2>
+  </div>`;
+
+  if(d.type==='product'){
+    const dt = d.detail;
+    html += `<div class="panel-section drivers">
+      <h4>Demand drivers</h4>
+      <p><span class="label">Seasonal demand</span>${esc(dt.seasonal)}</p>
+      <p><span class="label">Natural calamity impact</span>${esc(dt.calamity)}</p>
+      <p><span class="label">Man-made factors</span>${esc(dt.manmade)}</p>
+      <p><span class="label">Current demand rating</span>${tag(dt.rating)}</p>
+    </div>`;
+  }
+
+  if(d.type==='material'){
+    const dt = d.detail;
+    html += `<div class="panel-section"><h4>Role in network</h4>
+      <div class="kv"><span class="k">Concentration</span><span class="v">${dt.hub ? 'Cross-product hub' : dt.isolated ? 'Single-product / isolated' : 'Standard'}</span></div>
+      <div class="kv"><span class="k">Used in products</span><span class="v">${usage.filter(u=>u.material===d.name).length}</span></div>
+      ${dt.exception ? '<div class="kv"><span class="k">Note</span><span class="v">Documented exception — outside China/Ukraine closed set</span></div>' : ''}
+    </div>`;
+    html += `<div class="panel-section"><h4>Usage by product</h4>`;
+    usage.filter(u=>u.material===d.name).forEach(u=>{
+      html += `<div class="usage-card">
+        <span class="prod">${esc(u.product)}</span>
+        <div class="kv"><span class="k">Composition</span><span class="v">${esc(u.composition)}</span></div>
+        <div class="kv"><span class="k">Source</span><span class="v">${esc(u.source.join('; '))}</span></div>
+        ${u.site ? `<div class="kv"><span class="k">Site</span><span class="v">${esc(u.site)}</span></div>`:''}
+        <div class="kv"><span class="k">Price</span><span class="v">${esc(u.price)}</span></div>
+        <div class="kv"><span class="k">Export status</span><span class="v">${tag(u.exportStatus)}</span></div>
+        ${u.extra ? `<div class="kv"><span class="k">${esc(u.extra.split(':')[0])}</span><span class="v">${esc(u.extra.split(':')[1])}</span></div>`:''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if(d.type==='plant'){
+    const dt = d.detail;
+    html += `<div class="panel-section"><h4>Manufacturing details</h4>
+      <div class="kv"><span class="k">Product</span><span class="v">${esc(dt.product)}</span></div>
+      <div class="kv"><span class="k">Location</span><span class="v">${esc(fullLocation(dt.city))}</span></div>
+      <div class="kv"><span class="k">Materials processed</span><span class="v">${esc(dt.materials.join(', '))}</span></div>
+      <div class="kv"><span class="k">Capacity</span><span class="v">${esc(dt.capacity)}</span></div>
+      <div class="kv"><span class="k">Transport cost</span><span class="v">${esc(dt.transport)}</span></div>
+      <div class="kv"><span class="k">Local rules</span><span class="v">None</span></div>
+    </div>`;
+  }
+
+  if(d.type==='warehouse'){
+    const dt = d.detail;
+    html += `<div class="panel-section"><h4>Distribution details</h4>
+      <div class="kv"><span class="k">Product</span><span class="v">${esc(dt.product)}</span></div>
+      <div class="kv"><span class="k">Location</span><span class="v">${esc(fullLocation(dt.city))}</span></div>
+      <div class="kv"><span class="k">Materials stored</span><span class="v">${esc(dt.materials.join(', '))}</span></div>
+      <div class="kv"><span class="k">Warehouse cost</span><span class="v">${esc(dt.cost)}</span></div>
+      <div class="kv"><span class="k">Local rules</span><span class="v">None</span></div>
+    </div>`;
+  }
+
+  if(d.type==='country' || d.type==='state' || d.type==='city'){
+    html += `<div class="panel-section"><h4>Location</h4>
+      <div class="kv"><span class="k">Level</span><span class="v">${d.type[0].toUpperCase()+d.type.slice(1)}</span></div>
+      ${d.type==='city' ? `<div class="kv"><span class="k">Full path</span><span class="v">${esc(fullLocation(d.name))}</span></div>`:''}
+      <div class="kv"><span class="k">Connections</span><span class="v">${degree[d.id]}</span></div>
+    </div>`;
+  }
+
+  // generic connections
+  const groups = connGroups(d.id);
+  if(Object.keys(groups).length){
+    html += `<div class="panel-section"><h4>Connections</h4>`;
+    Object.entries(groups).forEach(([rel, arr])=>{
+      html += `<div class="conn-group"><div class="rel">${esc(rel)}</div>`;
+      arr.forEach(o=>{
+        const dispName = o.type==='plant' ? o.name.split(' — ')[1] : o.type==='warehouse' ? o.name.split(' — ')[1] : o.name;
+        html += `<span class="conn-chip" data-id="${o.id}"><span class="conn-dot" style="background:${o.color}"></span>${esc(dispName)}</span>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  panel.innerHTML = html;
+  panel.querySelectorAll('.conn-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const target = nodeById[chip.dataset.id];
+      selectNode(target);
+      centerOn(target);
+    });
+  });
+}
+
+function labelForType(d){
+  if(d.type==='material'){
+    if(d.detail.hub) return 'Hub Material';
+    if(d.detail.isolated) return 'Isolated Material';
+    return 'Raw Material';
+  }
+  const m = {product:'Product', country:'Country', state:'State / Oblast', city:'City', plant:'Manufacturing Plant', warehouse:'Distribution Hub'};
+  return m[d.type]||d.type;
+}
+function fullLocation(cityName){
+  const c = cities.find(x=>x.id===cityName);
+  if(!c) return cityName;
+  if(c.country) return `${cityName}, ${c.country}`;
+  const st = states.find(s=>s.id===c.state);
+  return `${cityName}, ${c.state}, ${st.country}`;
+}
+function centerOn(d){
+  const t = d3.zoomTransform(svg.node());
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(w/2 - d.x*t.k, h/2 - d.y*t.k).scale(t.k));
+}
+</script>
+</body>
+</html>
