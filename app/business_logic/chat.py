@@ -59,6 +59,11 @@ def _normalize_custom(payload) -> tuple[str, dict] | None:
             "content": payload.get("content"),
             "status": payload.get("status", "success"),
         }
+    if kind == "report.presented":
+        return "report.presented", {
+            "name": payload.get("name") or "",
+            "content": payload.get("content") or "",
+        }
     return None
 
 

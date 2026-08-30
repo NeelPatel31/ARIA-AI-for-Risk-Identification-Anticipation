@@ -68,6 +68,9 @@ def _create_task_tool(tools, subagents: list[SubAgent], model, state_schema):
 
         sub_agent = agents[subagent_type]
         state = dict(runtime.state)
+        if "todos" in state:
+            state["todos"] = []
+            
         state["messages"] = [{"role": "user", "content": description}]
         result = await sub_agent.ainvoke(state)
 

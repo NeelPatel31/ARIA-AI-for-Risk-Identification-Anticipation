@@ -20,6 +20,7 @@ from streamlit_app.render import (
     format_tool_result_event,
     render_ai_text,
     render_message,
+    render_presented_reports_sidebar,
 )
 
 API_BASE = os.getenv("API_BASE", "http://localhost:4000")
@@ -33,12 +34,15 @@ def _init_state() -> None:
         st.session_state.messages = []
     if "active_run" not in st.session_state:
         st.session_state.active_run = None
+    if "presented_reports" not in st.session_state:
+        st.session_state.presented_reports = {}
 
 
 def _new_session() -> None:
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.messages = []
     st.session_state.active_run = None
+    st.session_state.presented_reports = {}
 
 
 def _consume_events(
@@ -81,6 +85,10 @@ def _apply_packet(run: dict, packet: dict) -> bool:
     elif event == "tool.result":
         _flush_ai_text(run)
         run["turn_messages"].append(format_tool_result_event(data))
+    elif event == "report.presented":
+        name = data.get("name") or ""
+        if name:
+            st.session_state.presented_reports[name] = data.get("content") or ""
     elif event == "ai.token":
         run["ai_text_buffer"] += data.get("text", "")
     elif event == "error":
@@ -104,6 +112,9 @@ def _render_active_run() -> None:
         except queue.Empty:
             break
         ended = _apply_packet(run, packet) or ended
+
+    # Refresh sidebar as reports arrive mid-stream
+    render_presented_reports_sidebar(st.session_state.presented_reports)
 
     with st.chat_message("assistant"):
         if run["error"]:
@@ -143,6 +154,8 @@ def _start_run(user_text: str) -> None:
 def main() -> None:
     st.set_page_config(page_title="ARIA", layout="wide")
     _init_state()
+
+    render_presented_reports_sidebar(st.session_state.presented_reports)
 
     col_title, col_action = st.columns([4, 1])
     with col_title:

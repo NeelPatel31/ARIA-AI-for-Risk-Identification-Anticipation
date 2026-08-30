@@ -35,6 +35,30 @@ def render_ai_text(content: str) -> None:
         st.markdown(content)
 
 
+def render_presented_reports_sidebar(reports: dict[str, str]) -> None:
+    """Render presented reports in the sidebar as named expanders."""
+    with st.sidebar:
+        st.subheader("Presented Reports")
+        if not reports:
+            st.caption("No reports presented yet.")
+            return
+        for name in sorted(reports.keys()):
+            content = reports[name]
+            with st.expander(name, expanded=False):
+                if content.strip():
+                    st.markdown(content)
+                else:
+                    st.caption("(empty report)")
+                st.download_button(
+                    f"Download {name}",
+                    data=content,
+                    file_name=f"{name}.md",
+                    mime="text/markdown",
+                    key=f"download_report_{name}",
+                    use_container_width=True,
+                )
+
+
 def render_message(message: dict[str, Any]) -> None:
     msg_type = message["type"]
     if msg_type == "user":
