@@ -4,7 +4,12 @@ from .rag import (
     retrieve_chunks,
     retrieve_news_chunks,
 )
-from .training import train_news_chunks, train_product_chunks
+from .training import (
+    insert_news_document,
+    insert_product_document,
+    train_news_chunks,
+    train_product_chunks,
+)
 from .chat import ActiveRunError, claim_session, release_session, stream_chat_events
 
 __all__ = [
@@ -12,6 +17,8 @@ __all__ = [
     "claim_session",
     "generate_answer",
     "generate_news_answer",
+    "insert_news_document",
+    "insert_product_document",
     "release_session",
     "retrieve_chunks",
     "retrieve_news_chunks",

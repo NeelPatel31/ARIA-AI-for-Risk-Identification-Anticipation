@@ -1,3 +1,3 @@
-from .models import QueryRequest, StreamChatRequest
+from .models import InsertDocumentRequest, QueryRequest, StreamChatRequest
 
-__all__ = ["QueryRequest", "StreamChatRequest"]
+__all__ = ["InsertDocumentRequest", "QueryRequest", "StreamChatRequest"]

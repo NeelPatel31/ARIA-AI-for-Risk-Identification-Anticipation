@@ -56,12 +56,63 @@ def _delete_collection(collection_name: str) -> None:
         )
 
 
-def load_and_split_documents() -> tuple[list[Document], int]:
+def _product_chunks_from_markdown(raw_md: str, *, source: str | None = None) -> list[Document]:
     splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=HEADERS_TO_SPLIT_ON,
         strip_headers=False,
     )
+    frontmatter = parse_frontmatter(raw_md)
+    body = _strip_frontmatter(raw_md)
+    chunks = splitter.split_text(body)
+    for chunk in chunks:
+        chunk.metadata["product"] = frontmatter.get("product")
+        chunk.metadata["entities"] = frontmatter.get("entities")
+        if source:
+            chunk.metadata["source"] = source
+    return chunks
 
+
+def _news_document_from_markdown(raw_md: str, *, source: str) -> Document:
+    frontmatter = parse_frontmatter(raw_md)
+    body = _strip_frontmatter(raw_md)
+    metadata = {
+        key: _serialize_metadata_value(value)
+        for key, value in frontmatter.items()
+    }
+    metadata["source"] = source
+    return Document(page_content=body, metadata=metadata)
+
+
+def _normalize_markdown_filename(filename: str) -> str:
+    if not filename or "/" in filename or "\\" in filename:
+        raise ValueError("filename must be a bare file name without directories")
+    if filename in {".", ".."}:
+        raise ValueError("filename must be a bare file name without directories")
+    if not filename.endswith(".md"):
+        raise ValueError("filename must end with .md")
+    return filename
+
+
+def _get_vectorstore(collection_name: str) -> Chroma:
+    return Chroma(
+        persist_directory=str(constants.CHROMA_PERSIST_DIR),
+        collection_name=collection_name,
+        embedding_function=_build_embeddings(),
+    )
+
+
+def _add_documents_to_collection(
+    documents: list[Document],
+    *,
+    collection_name: str,
+) -> int:
+    shredded_documents = list(ShreddingTransformer().transform_documents(documents))
+    vectorstore = _get_vectorstore(collection_name)
+    vectorstore.add_documents(shredded_documents)
+    return len(documents)
+
+
+def load_and_split_documents() -> tuple[list[Document], int]:
     all_chunks: list[Document] = []
     product_files = sorted(constants.PRODUCT_DATA_DIR.glob("*.md"))
 
@@ -72,21 +123,13 @@ def load_and_split_documents() -> tuple[list[Document], int]:
         return all_chunks, 0
     for file_path in product_files:
         raw_md = file_path.read_text(encoding="utf-8")
-        frontmatter = parse_frontmatter(raw_md)
-
-        body = _strip_frontmatter(raw_md)
-
-        chunks = splitter.split_text(body)
-        for chunk in chunks:
-            chunk.metadata["product"] = frontmatter.get("product")
-            chunk.metadata["entities"] = frontmatter.get("entities")
-
+        chunks = _product_chunks_from_markdown(raw_md, source=file_path.name)
         all_chunks.extend(chunks)
         logger.info(
             "Split %s into %s chunks (product=%s)",
             file_path.name,
             len(chunks),
-            frontmatter.get("product"),
+            chunks[0].metadata.get("product") if chunks else None,
         )
 
     return all_chunks, len(product_files)
@@ -102,21 +145,13 @@ def load_news_documents() -> tuple[list[Document], int]:
 
     for file_path in news_files:
         raw_md = file_path.read_text(encoding="utf-8")
-        frontmatter = parse_frontmatter(raw_md)
-        body = _strip_frontmatter(raw_md)
-
-        metadata = {
-            key: _serialize_metadata_value(value)
-            for key, value in frontmatter.items()
-        }
-        metadata["source"] = file_path.name
-
-        documents.append(Document(page_content=body, metadata=metadata))
+        document = _news_document_from_markdown(raw_md, source=file_path.name)
+        documents.append(document)
         logger.info(
             "Loaded news document %s (event_id=%s, published_date=%s)",
             file_path.name,
-            metadata.get("event_id"),
-            metadata.get("published_date"),
+            document.metadata.get("event_id"),
+            document.metadata.get("published_date"),
         )
 
     return documents, len(news_files)
@@ -194,4 +229,77 @@ def train_news_chunks() -> dict:
         "chunks": len(documents),
         "files": file_count,
         "message": "News documents ingested successfully",
+    }
+
+
+def insert_product_document(*, markdown: str, filename: str) -> dict:
+    name = _normalize_markdown_filename(filename)
+    destination = constants.PRODUCT_DATA_DIR / name
+    if destination.exists():
+        raise FileExistsError(f"Product file already exists: {name}")
+
+    chunks = _product_chunks_from_markdown(markdown, source=name)
+    if not chunks:
+        raise ValueError("No product chunks produced from markdown")
+
+    constants.PRODUCT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    destination.write_text(markdown, encoding="utf-8")
+
+    inserted = _add_documents_to_collection(
+        chunks,
+        collection_name=constants.CHROMA_COLLECTION_NAME,
+    )
+
+    from .rag import get_retriever
+
+    get_retriever(force_reload=True)
+
+    logger.info(
+        "Inserted product '%s' as %s chunks into collection '%s'",
+        name,
+        inserted,
+        constants.CHROMA_COLLECTION_NAME,
+    )
+    return {
+        "filename": name,
+        "chunks": inserted,
+        "product": chunks[0].metadata.get("product"),
+        "message": "Product inserted into collection successfully",
+    }
+
+
+def insert_news_document(*, markdown: str, filename: str) -> dict:
+    name = _normalize_markdown_filename(filename)
+    destination = constants.NEWS_DATA_DIR / name
+    if destination.exists():
+        raise FileExistsError(f"News file already exists: {name}")
+
+    document = _news_document_from_markdown(markdown, source=name)
+    if not document.page_content.strip():
+        raise ValueError("News markdown body is empty")
+
+    constants.NEWS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    destination.write_text(markdown, encoding="utf-8")
+
+    inserted = _add_documents_to_collection(
+        [document],
+        collection_name=constants.CHROMA_NEWS_COLLECTION_NAME,
+    )
+
+    from .rag import get_news_retriever
+
+    get_news_retriever(force_reload=True)
+
+    logger.info(
+        "Inserted news '%s' into collection '%s' (event_id=%s)",
+        name,
+        constants.CHROMA_NEWS_COLLECTION_NAME,
+        document.metadata.get("event_id"),
+    )
+    return {
+        "filename": name,
+        "chunks": inserted,
+        "event_id": document.metadata.get("event_id"),
+        "published_date": document.metadata.get("published_date"),
+        "message": "News inserted into collection successfully",
     }

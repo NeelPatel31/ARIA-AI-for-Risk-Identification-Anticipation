@@ -6,12 +6,14 @@ from fastapi.responses import JSONResponse
 from app.apis.controllers import (
     generate_answer_controller,
     generate_news_answer_controller,
+    insert_news_controller,
+    insert_product_controller,
     retrieve_chunks_controller,
     retrieve_news_chunks_controller,
     train_news_chunks_controller,
     train_product_chunks_controller,
 )
-from app.apis.validation_models import QueryRequest
+from app.apis.validation_models import InsertDocumentRequest, QueryRequest
 from app.utils import logger
 
 internals_router = APIRouter(tags=["internals"])
@@ -59,6 +61,40 @@ async def train_news():
         logger.error(f"Error in /train-news endpoint: {e}", exc_info=True)
         return JSONResponse(
             content={"error": "News training failed", "detail": str(e)},
+            status_code=500,
+        )
+
+
+@internals_router.post("/insert-product")
+async def insert_product(request: InsertDocumentRequest):
+    try:
+        result = insert_product_controller(
+            filename=request.filename,
+            markdown=request.markdown,
+        )
+        logger.info(f"/insert-product completed for file: {request.filename}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in /insert-product endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "Product insert failed", "detail": str(e)},
+            status_code=500,
+        )
+
+
+@internals_router.post("/insert-news")
+async def insert_news(request: InsertDocumentRequest):
+    try:
+        result = insert_news_controller(
+            filename=request.filename,
+            markdown=request.markdown,
+        )
+        logger.info(f"/insert-news completed for file: {request.filename}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in /insert-news endpoint: {e}", exc_info=True)
+        return JSONResponse(
+            content={"error": "News insert failed", "detail": str(e)},
             status_code=500,
         )
 

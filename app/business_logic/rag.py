@@ -45,8 +45,14 @@ def _build_retriever(collection_name: str) -> GraphRetriever:
     )
 
 
-def get_retriever() -> GraphRetriever:
+def get_retriever(*, force_reload: bool = False) -> GraphRetriever:
     global _retriever
+    if force_reload:
+        with _retriever_lock:
+            _retriever = _build_retriever(constants.CHROMA_COLLECTION_NAME)
+            logger.info("Reloaded product GraphRetriever instance")
+            return _retriever
+
     if _retriever is None:
         with _retriever_lock:
             if _retriever is None:
