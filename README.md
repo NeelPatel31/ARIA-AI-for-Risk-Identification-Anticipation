@@ -1,6 +1,14 @@
 # ARIA — AI for Risk Identification & Anticipation
 
-ARIA is an agentic supply-chain risk assistant. It orchestrates specialist AI agents to map a product's supply chain, surface relevant disruptions, quantify risk with a deterministic scoring tool, and propose mitigations — all surfaced through a chat UI backed by a FastAPI streaming server and a Chroma vector store.
+ARIA (**A**I for **R**isk **I**dentification & **A**nticipation) is an agentic supply-chain risk assistant. It orchestrates specialist AI agents to map a product's supply chain, surface relevant disruptions, quantify risk with a deterministic scoring tool, and propose mitigations — all surfaced through a chat UI backed by a FastAPI streaming server and a Chroma vector store.
+
+**What it does, briefly:**
+
+- **Maps supply chains** — given a product, ARIA builds a structured footprint (demand drivers, raw materials, sourcing, manufacturing plants, delivery hubs, local rules) from a product knowledge base.
+- **Surfaces disruptions** — it joins that footprint against a news/event collection to surface recent risk events tied to the product's materials and sites.
+- **Quantifies risk** — each risk is scored deterministically (Severity × Exposure × Fragility) into Low / Moderate / High / Critical bands.
+- **Proposes mitigations** — traces scored risks to root causes and produces cited, actionable recommendations.
+- **Visualizes the data** — the Streamlit UI ships interactive **knowledge graphs of both the product and news datasets** (see [Knowledge graphs](#knowledge-graphs)), so you can explore the entities and relationships behind the answers.
 
 ## Project Structure
 
@@ -29,7 +37,9 @@ ARIA is an agentic supply-chain risk assistant. It orchestrates specialist AI ag
 ├── streamlit_app/              # Frontend (Streamlit chat UI)
 │   ├── app.py                  # Chat app, session handling, streaming loop
 │   ├── api_client.py           # SSE client for /stream-chat
-│   └── render.py               # Message, tool-call, and report rendering (+ report download)
+│   ├── render.py               # Message, tool-call, and report rendering (+ report download)
+│   ├── pages/                  # Streamlit pages for the knowledge graph visualizations
+│   └── visualization/          # D3 knowledge-graph HTML (product + news)
 ├── data/
 │   ├── products/*.md           # Product supply-chain knowledge documents
 │   ├── news/*.md               # Disruption / news event documents
@@ -37,6 +47,26 @@ ARIA is an agentic supply-chain risk assistant. It orchestrates specialist AI ag
 ├── main.py                     # Uvicorn entrypoint
 └── pyproject.toml              # Project metadata and dependencies
 ```
+
+## Documentation
+
+| File | What it holds |
+|---|---|
+| [`README.md`](#) | This file — project overview, architecture, training flow, setup, and API reference. |
+| [`DATA_SUMMARY.md`](DATA_SUMMARY.md) | Fast-lookup reference for the entire dataset: every product, raw material, plant, hub, location, and all 21 news events, plus the built-in risk hotspots. |
+| [`SAMPLE_QUERIES.md`](SAMPLE_QUERIES.md) | Ready-to-run evaluation queries grouped into the five user-request scenarios, each with the expected outcome and the backing sources. |
+| [`data/data_generation_prompts/DATA_PROMPT.md`](data/data_generation_prompts/DATA_PROMPT.md) | The generation spec the fake dataset was built from — file conventions, closed entity sets (products, materials, locations), and consistency rules. |
+| `data/products/*.md` | Raw product knowledge documents (one per product) with YAML frontmatter and Planning / Sourcing / Manufacturing / Delivery stages. |
+| `data/news/*.md` | Raw news / disruption event documents with YAML frontmatter (`event_id`, `published_date`, `entities`, `event_type`) and a summary/impact body. |
+
+## Knowledge graphs
+
+The Streamlit app includes interactive D3 knowledge graphs of both datasets, accessible from the sidebar:
+
+- **Product knowledge graph** — nodes for products, materials, plants, hubs, and local rules, with edges for the sourcing / manufacturing / delivery relationships.
+- **News knowledge graph** — nodes for news events, materials, and locations, with edges linking each disruption to the entities it hits.
+
+Open the chat UI and pick either page from the sidebar navigation (`ARIA` → *Product Knowledge Graph* / *News Knowledge Graph*).
 
 ## Agents and Capabilities
 
